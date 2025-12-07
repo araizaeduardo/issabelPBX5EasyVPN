@@ -76,15 +76,24 @@ function _moduleContent(&$smarty, $module_name)
             $smarty->assign("mb_message", _tr("No se encontró el archivo para descargar."));
         }
     }
-
     // --- Crear cliente desde el formulario ---
     $message = '';
     $messageClass = '';
 
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $action = getParameter('action');
+    $action    = getParameter('action');
+    $logFilter = getParameter('log_filter');
+    $logLines  = getParameter('log_lines');
 
+    if ($logLines === null || $logLines === '') {
+        $logLines = 200;
+    }
+    $logLines = (int)$logLines;
+    if ($logLines <= 0) $logLines = 200;
+    if ($logLines > 2000) $logLines = 2000;
+
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'create_client') {
             $clientName = trim(getParameter('client_name'));
             $err = '';
@@ -141,6 +150,9 @@ function _moduleContent(&$smarty, $module_name)
                 $message      = nl2br(htmlspecialchars($err));
                 $messageClass = "easyvpn-message-error";
             }
+        } elseif ($action === 'view_logs') {
+            $message      = "Mostrando logs de OpenVPN (últimas $logLines líneas).";
+            $messageClass = "easyvpn-message-ok";
         }
     }
 
@@ -148,6 +160,7 @@ function _moduleContent(&$smarty, $module_name)
     $clients = easyvpn_list_clients();
     $vpnServiceStatus = easyvpn_get_service_status();
     $status = easyvpn_get_status();
+    $logsData = easyvpn_get_logs($logLines, $logFilter);
 
     // HTML
     $html  = '<link rel="stylesheet" type="text/css" href="modules/'.$module_name.'/css/style.css">';
@@ -205,6 +218,38 @@ function _moduleContent(&$smarty, $module_name)
     $html .= '    </form>';
 
     $html .= '  </div>';
+
+    // --- Sección: Logs de OpenVPN ---
+    $html .= '  <div class="easyvpn-section-title">'._tr("Logs del servidor OpenVPN").'</div>';
+
+    $html .= '  <form method="post" class="easyvpn-log-form">';
+    $html .= '    <input type="hidden" name="action" value="view_logs">';
+
+    $html .= '    <label>'._tr("Filtro").': </label>';
+    $html .= '    <input type="text" name="log_filter" value="'.htmlspecialchars($logFilter).'" size="20">';
+
+    $html .= '    <label style="margin-left:10px;">'._tr("Líneas").': </label>';
+    $html .= '    <select name="log_lines">';
+    foreach (array(100, 200, 500, 1000, 2000) as $opt) {
+        $sel = ($logLines == $opt) ? ' selected' : '';
+        $html .= '<option value="'.$opt.'"'.$sel.'>'.$opt.'</option>';
+    }
+    $html .= '    </select>';
+
+    $html .= '    <input type="submit" value="'._tr("Actualizar").'" style="margin-left:10px;">';
+    $html .= '  </form>';
+
+    if ($logsData['error'] !== '') {
+        $html .= '  <div class="easyvpn-message-error">'.htmlspecialchars($logsData['error']).'</div>';
+    } elseif (empty($logsData['lines'])) {
+        $html .= '  <div class="easyvpn-message">'._tr("No hay líneas de log para mostrar.").'</div>';
+    } else {
+        $html .= '  <div class="easyvpn-log-box"><pre>';
+        foreach ($logsData['lines'] as $line) {
+            $html .= htmlspecialchars($line)."\n";
+        }
+        $html .= '</pre></div>';
+    }
 
     // Formulario crear cliente
     $html .= '  <div class="easyvpn-section-title">'._tr("Crear nuevo cliente").'</div>';
