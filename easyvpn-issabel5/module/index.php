@@ -5,7 +5,6 @@
 include_once "libs/paloSantoGrid.class.php";
 include_once "libs/paloSantoForm.class.php";
 include_once "libs/paloSantoConfig.class.php";
-include_once "libs/paloACL.class.php";
 require_once "libs/misc.lib.php";
 
 function _moduleContent(&$smarty, $module_name)

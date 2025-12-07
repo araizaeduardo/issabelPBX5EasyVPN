@@ -222,3 +222,55 @@ function easyvpn_control_service($op, &$error) {
 }
 
 
+function easyvpn_get_logs($maxLines = 200, $filter = '')
+{
+    $logFile = '/var/log/openvpn/easyvpn.log';
+    $result = array(
+        'error' => '',
+        'lines' => array(),
+    );
+
+    if (!file_exists($logFile)) {
+        $result['error'] = "No existe el archivo de log: $logFile";
+        return $result;
+    }
+    if (!is_readable($logFile)) {
+        $result['error'] = "No se puede leer el archivo de log (permisos): $logFile";
+        return $result;
+    }
+
+    $allLines = @file($logFile, FILE_IGNORE_NEW_LINES);
+    if ($allLines === false) {
+        $result['error'] = 'Error leyendo el archivo de log.';
+        return $result;
+    }
+
+    $total = count($allLines);
+    if ($total === 0) {
+        return $result;
+    }
+
+    $maxLines = (int)$maxLines;
+    if ($maxLines <= 0) $maxLines = 200;
+    if ($maxLines > 2000) $maxLines = 2000;
+
+    $start = max(0, $total - $maxLines);
+    $slice = array_slice($allLines, $start);
+
+    $filter = trim((string)$filter);
+    if ($filter !== '') {
+        $f = strtolower($filter);
+        $filtered = array();
+        foreach ($slice as $line) {
+            if (strpos(strtolower($line), $f) !== false) {
+                $filtered[] = $line;
+            }
+        }
+        $slice = $filtered;
+    }
+
+    $result['lines'] = $slice;
+    return $result;
+}
+
+
