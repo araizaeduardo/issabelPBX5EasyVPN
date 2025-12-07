@@ -152,6 +152,15 @@ install_openvpn_server() {
     echo "   PKI creada (CA, server, dh, crl, ta.key)."
   fi
 
+  if [[ ! -f "${EASYVPN_DIR}/ta.key" ]]; then
+    echo "-> Generando ta.key en ${EASYVPN_DIR} ..."
+    cd "${EASYVPN_DIR}"
+    openvpn --genkey --secret ta.key
+  fi
+
+  chown root:asterisk "${EASYVPN_DIR}/ta.key"
+  chmod 640 "${EASYVPN_DIR}/ta.key"
+
   # 4) Copiar llaves a keys/
   echo "-> Preparando keys en ${EASYVPN_KEYS_DIR} ..."
   cd "${EASYVPN_DIR}"
