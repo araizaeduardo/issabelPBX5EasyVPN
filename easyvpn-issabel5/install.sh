@@ -88,13 +88,14 @@ install_scripts() {
   install -o root -g root -m 750 "${script_dir}/scripts/easyvpn-regenerate-profile.sh" "${SCRIPTS_TARGET_DIR}/easyvpn-regenerate-profile.sh"
   install -o root -g root -m 750 "${script_dir}/scripts/easyvpn-status.sh"             "${SCRIPTS_TARGET_DIR}/easyvpn-status.sh"
   install -o root -g root -m 750 "${script_dir}/scripts/easyvpn-service.sh"            "${SCRIPTS_TARGET_DIR}/easyvpn-service.sh"
+  install -o root -g root -m 750 "${script_dir}/scripts/easyvpn-kick-client.sh"        "${SCRIPTS_TARGET_DIR}/easyvpn-kick-client.sh"
   echo "   Scripts instalados."
 }
 
 install_sudoers() {
   echo "-> Configurando sudoers en ${SUDOERS_FILE} ..."
   cat > "${SUDOERS_FILE}" <<'EOF'
-asterisk ALL=(root) NOPASSWD: /usr/local/sbin/easyvpn-create-client.sh, /usr/local/sbin/easyvpn-revoke-client.sh, /usr/local/sbin/easyvpn-regenerate-profile.sh, /usr/local/sbin/easyvpn-status.sh, /usr/local/sbin/easyvpn-service.sh
+asterisk ALL=(root) NOPASSWD: /usr/local/sbin/easyvpn-create-client.sh, /usr/local/sbin/easyvpn-revoke-client.sh, /usr/local/sbin/easyvpn-regenerate-profile.sh, /usr/local/sbin/easyvpn-status.sh, /usr/local/sbin/easyvpn-service.sh, /usr/local/sbin/easyvpn-kick-client.sh
 EOF
   chmod 440 "${SUDOERS_FILE}"
   visudo -cf "${SUDOERS_FILE}" >/dev/null || {
@@ -219,6 +220,7 @@ remote-cert-tls client
 status ${STATUS_LOG}
 status-version 2
 log-append /var/log/openvpn/easyvpn.log
+management 127.0.0.1 7505
 verb 3
 
 client-config-dir ${EASYVPN_CCD_DIR}

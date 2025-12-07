@@ -130,6 +130,17 @@ function _moduleContent(&$smarty, $module_name)
                 $message      = nl2br(htmlspecialchars($err));
                 $messageClass = "easyvpn-message-error";
             }
+        } elseif ($action === 'disconnect_client') {
+            $cid = getParameter('client_id');
+            $err = '';
+
+            if (easyvpn_disconnect_client($cid, $err)) {
+                $message      = "Cliente VPN desconectado (ID ".htmlspecialchars($cid).").";
+                $messageClass = "easyvpn-message-ok";
+            } else {
+                $message      = nl2br(htmlspecialchars($err));
+                $messageClass = "easyvpn-message-error";
+            }
         }
     }
 
@@ -265,12 +276,19 @@ function _moduleContent(&$smarty, $module_name)
     $html .= '  </div>';
 
     $html .= '  <table id="easyvpn-status-table" class="easyvpn-table">';
-    $html .= '    <tr><th>CN</th><th>Real Address</th><th>IP VPN</th><th>Bytes Recv</th><th>Bytes Sent</th><th>Conectado Desde</th></tr>';
+    $html .= '    <tr><th>CN</th><th>Real Address</th><th>IP VPN</th><th>Bytes Recv</th><th>Bytes Sent</th><th>Conectado Desde</th><th>Acciones</th></tr>';
 
     if (empty($status)) {
-        $html .= '    <tr><td colspan="6">'._tr("No hay clientes conectados o no hay status.").'</td></tr>';
+        $html .= '    <tr><td colspan="7">'._tr("No hay clientes conectados o no hay status.").'</td></tr>';
     } else {
         foreach ($status as $s) {
+            $kickForm = '
+        <form method="post" style="display:inline;" onsubmit="return confirm(\'¿Desconectar '.htmlspecialchars($s['cn']).'?\');">
+            <input type="hidden" name="action" value="disconnect_client">
+            <input type="hidden" name="client_id" value="'.htmlspecialchars($s['client_id']).'">
+            <input type="submit" value="Desconectar">
+        </form>';
+
             $html .= '    <tr>';
             $html .= '      <td>'.htmlspecialchars($s['cn']).'</td>';
             $html .= '      <td>'.htmlspecialchars($s['real_address']).'</td>';
@@ -278,6 +296,7 @@ function _moduleContent(&$smarty, $module_name)
             $html .= '      <td>'.htmlspecialchars($s['bytes_recv']).'</td>';
             $html .= '      <td>'.htmlspecialchars($s['bytes_sent']).'</td>';
             $html .= '      <td>'.htmlspecialchars($s['connected_since']).'</td>';
+            $html .= '      <td>'.$kickForm.'</td>';
             $html .= '    </tr>';
         }
     }

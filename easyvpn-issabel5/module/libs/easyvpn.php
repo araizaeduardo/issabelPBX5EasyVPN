@@ -104,7 +104,7 @@ function easyvpn_get_status() {
         // CLIENT_LIST,CN,Real Address,Virtual Address,Virtual IPv6,BytesRecv,BytesSent,Connected Since,Connected Since (time_t),Username,ClientID,PeerID
         if (strpos($line, 'CLIENT_LIST,') === 0) {
             $parts = str_getcsv($line);
-            if (count($parts) < 8) {
+            if (count($parts) < 11) {
                 continue;
             }
 
@@ -115,6 +115,7 @@ function easyvpn_get_status() {
                 'bytes_recv'      => $parts[5],
                 'bytes_sent'      => $parts[6],
                 'connected_since' => $parts[7],
+                'client_id'       => $parts[10],
             );
         }
     }
@@ -155,6 +156,27 @@ function easyvpn_regenerate_profile($cn, &$error) {
 
     if ($ret !== 0) {
         $error = "Error regenerando perfil para '$cn':\n".implode("\n", $output);
+        return false;
+    }
+
+    return true;
+}
+
+
+function easyvpn_disconnect_client($clientId, &$error) {
+    $error = '';
+    $clientId = trim($clientId);
+
+    if ($clientId === '' || !ctype_digit($clientId)) {
+        $error = "Client ID inválido.";
+        return false;
+    }
+
+    $cmd = 'sudo /usr/local/sbin/easyvpn-kick-client.sh ' . escapeshellarg($clientId) . ' 2>&1';
+    exec($cmd, $output, $ret);
+
+    if ($ret !== 0) {
+        $error = "Error al desconectar cliente (ID $clientId):\n".implode("\n", $output);
         return false;
     }
 
