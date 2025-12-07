@@ -8,8 +8,15 @@ install_default_settings() {
     return
   fi
 
-  echo "-> Instalando configuración base en ${SETTINGS_FILE} ..."
-  install -o root -g asterisk -m 640 "${script_dir}/config/easyvpn-settings.conf" "${SETTINGS_FILE}"
+  if [[ -f "${script_dir}/config/easyvpn-settings.conf" ]]; then
+    echo "-> Instalando configuración base en ${SETTINGS_FILE} ..."
+    install -o root -g asterisk -m 640 "${script_dir}/config/easyvpn-settings.conf" "${SETTINGS_FILE}"
+  else
+    echo "-> Archivo de configuración base no encontrado; se omitirá (${script_dir}/config/easyvpn-settings.conf)."
+    touch "${SETTINGS_FILE}"
+    chown root:asterisk "${SETTINGS_FILE}"
+    chmod 640 "${SETTINGS_FILE}"
+  fi
 }
 
 register_acl_and_menu() {
@@ -114,9 +121,9 @@ install_openvpn_server() {
   echo "==============================="
 
   # 1) Instalar paquetes
-  echo "-> Instalando paquetes openvpn y easy-rsa (Rocky)..."
+  echo "-> Instalando paquetes openvpn, easy-rsa y bc (Rocky)..."
   dnf install -y epel-release >/dev/null 2>&1 || true
-  dnf install -y openvpn easy-rsa >/dev/null
+  dnf install -y openvpn easy-rsa bc >/dev/null
 
   # 2) Directorios base
   echo "-> Creando estructura en ${EASYVPN_DIR} ..."
@@ -140,7 +147,7 @@ install_openvpn_server() {
     ./easyrsa gen-crl
 
     # ta.key para tls-auth
-    openvpn --genkey secret ta.key
+    openvpn --genkey --secret ta.key
 
     echo "   PKI creada (CA, server, dh, crl, ta.key)."
   fi
