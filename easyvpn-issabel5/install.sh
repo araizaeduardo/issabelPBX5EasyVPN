@@ -1,3 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODULE_NAME="easyvpn"
+ISSABEL_MODULE_DIR="/var/www/html/modules/${MODULE_NAME}"
+SCRIPTS_TARGET_DIR="/usr/local/sbin"
+
+EASYVPN_DIR="/etc/openvpn/easyvpn"
+EASYVPN_KEYS_DIR="${EASYVPN_DIR}/keys"
+EASYVPN_GENERATED_DIR="${EASYVPN_DIR}/generated"
+EASYVPN_CCD_DIR="${EASYVPN_DIR}/ccd"
+SERVER_CONF_DIR="/etc/openvpn/server"
+SERVER_CONF="${SERVER_CONF_DIR}/easyvpn.conf"
+STATUS_LOG="/var/log/openvpn/easyvpn-status.log"
+MAIN_LOG="/var/log/openvpn/easyvpn.log"
+SUDOERS_FILE="/etc/sudoers.d/easyvpn"
+
+SETTINGS_FILE="${EASYVPN_DIR}/easyvpn-settings.conf"
+ACL_DB="/var/www/db/acl.db"
+MENU_DB="/var/www/db/menu.db"
+
 install_default_settings() {
   local script_dir="$1"
 
@@ -41,26 +62,6 @@ register_acl_and_menu() {
     echo "   WARNING: No se encontró ${MENU_DB}, omitiendo menú." >&2
   fi
 }
-
-SETTINGS_FILE="${EASYVPN_DIR}/easyvpn-settings.conf"
-ACL_DB="/var/www/db/acl.db"
-MENU_DB="/var/www/db/menu.db"
-
-#!/usr/bin/env bash
-set -euo pipefail
-
-MODULE_NAME="easyvpn"
-ISSABEL_MODULE_DIR="/var/www/html/modules/${MODULE_NAME}"
-SCRIPTS_TARGET_DIR="/usr/local/sbin"
-
-EASYVPN_DIR="/etc/openvpn/easyvpn"
-EASYVPN_KEYS_DIR="${EASYVPN_DIR}/keys"
-EASYVPN_GENERATED_DIR="${EASYVPN_DIR}/generated"
-EASYVPN_CCD_DIR="${EASYVPN_DIR}/ccd"
-SERVER_CONF_DIR="/etc/openvpn/server"
-SERVER_CONF="${SERVER_CONF_DIR}/easyvpn.conf"
-STATUS_LOG="/var/log/openvpn/easyvpn-status.log"
-SUDOERS_FILE="/etc/sudoers.d/easyvpn"
 
 require_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
@@ -174,6 +175,17 @@ install_openvpn_server() {
   chown root:asterisk "${EASYVPN_KEYS_DIR}"/*
   chmod 640 "${EASYVPN_KEYS_DIR}"/*
 
+  echo "-> Ajustando permisos de PKI para web (asterisk) ..."
+  chown -R root:asterisk "${EASYVPN_DIR}/pki"
+  chmod 750 "${EASYVPN_DIR}/pki"
+
+  if [[ -f "${EASYVPN_DIR}/pki/index.txt" ]]; then
+    chmod 640 "${EASYVPN_DIR}/pki/index.txt"
+  fi
+  if [[ -f "${EASYVPN_DIR}/pki/index.txt.attr" ]]; then
+    chmod 640 "${EASYVPN_DIR}/pki/index.txt.attr"
+  fi
+
   # 5) client-template.ovpn (solo si no existe uno ya)
   if [[ -f "${EASYVPN_DIR}/client-template.ovpn" ]]; then
     echo "   - Ya existe client-template.ovpn en ${EASYVPN_DIR}, no se sobrescribe."
@@ -187,9 +199,15 @@ install_openvpn_server() {
   # 6) Log status
   echo "-> Preparando status log en ${STATUS_LOG} ..."
   mkdir -p /var/log/openvpn
-  touch /var/log/openvpn/easyvpn-status.log
-  chown root:asterisk /var/log/openvpn/easyvpn-status.log
-  chmod 640 /var/log/openvpn/easyvpn-status.log
+  touch "${STATUS_LOG}"
+  chown root:asterisk "${STATUS_LOG}"
+  chmod 640 "${STATUS_LOG}"
+
+  echo "-> Preparando log principal en ${MAIN_LOG} ..."
+  mkdir -p /var/log/openvpn
+  touch "${MAIN_LOG}"
+  chown root:asterisk "${MAIN_LOG}"
+  chmod 640 "${MAIN_LOG}"
 
   # 7) Crear server.conf si no existe
   mkdir -p "${SERVER_CONF_DIR}"
@@ -198,23 +216,21 @@ install_openvpn_server() {
   else
     echo "-> Creando configuración de servidor en ${SERVER_CONF} ..."
     cat > "${SERVER_CONF}" <<EOF
-port 1194
-proto udp
-dev tun
+port ${EASYVPN_PORT:-1194}
+proto ${EASYVPN_PROTO:-udp}
+dev ${EASYVPN_DEV:-tun}
 
 user nobody
 group nobody
 
 topology subnet
-server 172.16.0.0 255.255.255.0
+server ${EASYVPN_VPN_NET:-172.16.0.0} ${EASYVPN_VPN_MASK:-255.255.255.0}
 
 # Rango de VPN solo para teléfonos, ajusta según tus necesidades
-ifconfig-pool-persist /var/log/openvpn/ipp-easyvpn.txt
-
 # Rutas: aquí puedes empujar solo la IP del PBX si quieres aislar de la LAN
 # push "route 192.168.1.6 255.255.255.255"
 
-keepalive 10 120
+keepalive ${EASYVPN_KEEPALIVE_SEC:-10} ${EASYVPN_KEEPALIVE_RESTART:-120}
 persist-key
 persist-tun
 
@@ -228,15 +244,16 @@ key-direction 0
 
 crl-verify ${EASYVPN_KEYS_DIR}/crl.pem
 
-cipher AES-256-GCM
-auth SHA256
-ncp-ciphers AES-256-GCM:AES-128-GCM
+
+${EASYVPN_CIPHER_DIRECTIVE:-cipher AES-256-GCM}
+${EASYVPN_AUTH_DIRECTIVE:-auth SHA256}
+${EASYVPN_NCP_CIPHERS:-ncp-ciphers AES-256-GCM:AES-128-GCM}
 remote-cert-tls client
 
 status ${STATUS_LOG}
 status-version 2
-log-append /var/log/openvpn/easyvpn.log
-management 127.0.0.1 7505
+log-append ${MAIN_LOG}
+management ${EASYVPN_MGMT_HOST:-127.0.0.1} ${EASYVPN_MGMT_PORT:-7505}
 verb 3
 
 client-config-dir ${EASYVPN_CCD_DIR}
@@ -245,13 +262,12 @@ EOF
 
     chmod 640 "${SERVER_CONF}"
   fi
-
   echo "-> Habilitando y arrancando servicio openvpn-server@easyvpn ..."
   systemctl enable --now openvpn-server@easyvpn.service
 
   echo
   echo "Servidor EasyVPN instalado y habilitado."
-  echo "Ajusta ${SERVER_CONF} si necesitas rutas específicas (PBX, bloqueo LAN, etc.)."
+{{ ... }}
 }
 
 main() {
@@ -272,6 +288,10 @@ main() {
   install_scripts "${SCRIPT_DIR}"
   install_sudoers
   install_default_settings "${SCRIPT_DIR}"
+  if [[ -f "${SETTINGS_FILE}" ]]; then
+    # shellcheck source=/dev/null
+    . "${SETTINGS_FILE}"
+  fi
   register_acl_and_menu
 
   if [[ "${WITH_SERVER}" == "yes" ]]; then

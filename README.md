@@ -59,6 +59,15 @@ Este modo:
 - Configura `/etc/openvpn/server/easyvpn.conf` con `status-version 2`.
 - Instala `client-template.ovpn` listo para personalizar.
 
+### 3. Habilitar permisos en la GUI de Issabel
+
+Después de instalar, habilita el acceso al módulo desde la interfaz web:
+
+1. Ingresa a `System` → `Users` → `Group Permissions`.
+2. Selecciona la categoría `security`.
+3. Marca la casilla `easyvpn` para los grupos que deban acceder al módulo.
+4. Guarda los cambios.
+
 ## Funcionamiento del módulo
 
 - Los perfiles generados se guardan en `/etc/openvpn/easyvpn/generated/`.
